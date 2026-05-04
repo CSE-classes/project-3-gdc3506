@@ -25,17 +25,18 @@ void *producer(void *arg) {
 		printf("ERROR: can't open message.txt!\n");
 		return NULL;
 	}
+
 	char current_char;
 	
-	while((current = fgetc(fp)) != EOF) {
+	while((current_char = fgetc(fp)) != EOF) {
 		pthread_mutex_lock(&mutex);
 
-		// buffer full? then wait
+		// buffer full? then wait for consumer to consume
 		while(count == N) {
 			pthread_cond_wait(&empty, &mutex);
 		}
 
-		//insert item into buffer
+		//insert char into buffer
 		queue[tail] = current_char;
 		// wrap for circular queue
 		tail = (tail + 1) % N;
@@ -44,10 +45,48 @@ void *producer(void *arg) {
 		pthread_cond_signal(&full);
 		pthread_mutex_unlock(&mutex);
 	}
+	//end of file reached! tell consumer this
+
+	pthread_mutex_lock(&mutex);
+	// if full, wait for consumer to consume something to make space
+	while(count == N) {
+		pthread_cond_wait(&empty, &mutex);
+	}
+	queue[tail] = '\0'; //add end marker
+	count++;
+	pthread_cond_signal(&full);
+	pthread_mutex_unlock(&mutex);
+
+	fclose(fp);
+	return(NULL);
 }
 
 void *consumer(void *arg) {
+	while(1) {
+		pthread_mutex_lock(&mutex);
 
+		// wait until producer produces something
+		while(count == 0) {
+			pthread_cond_wait(&full, &mutex);
+		}
+
+		//extract top char from queue
+		char current_char = queue[head];
+		// circular queue, so wrap if needed
+		head = (head + 1) % N;
+		count--;
+
+		if(current_char == '\0') { // reached end?
+			pthread_mutex_unlock(&mutex);
+			break; //done reading
+		}
+
+		printf("%c", current_char);
+
+		pthread_cond_signal(&empty);
+		pthread_mutex_unlock(&mutex);
+	}
+	return(NULL);
 }
 
 //create producer and consumer threads

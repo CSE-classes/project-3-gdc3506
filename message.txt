@@ -1,2 +1,6 @@
-abcd
-ab
+wow this is a test
+hello
+
+this message has been printed by producer_consumer.c
+
+awesome!!
