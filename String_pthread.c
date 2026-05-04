@@ -72,7 +72,25 @@ int readf(FILE *fp)
 void *sub_string(void *threadid) 	/*each process searches in the string with the step of nprocs until it reach or beyond*/ 
 	/*the (n1-n2)th char which is the last possible beginning of the substring*/
 {
+	// problem says to assume n1 % NUM_THREADS == 0, n2 < n1/NUM_THREADS
+	int i,j,k;
+	int count;
 
+	// each process checks their own chunk
+	for (i = (nlocal * (int)threadid); i <= (n1-n2-(nlocal * (NUM_THREADS - (int)threadid) -1)); i++) {
+		count = 0;
+		for(j = i, k = 0; k < n2; j++,k++) {
+			if(*(s1+j) != *(s2+k)) {
+				break;
+			}
+			else {
+				count++;
+			}
+			if(count == n2) { //found substring?
+				total++;
+			}
+		}
+	}
 }
 
 
