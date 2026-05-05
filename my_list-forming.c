@@ -61,36 +61,52 @@ void * producer_thread( void *arg)
     struct Node * ptr, tmp;
     int counter = 0;  
 
-    /* generate and attach K nodes to the global list */
+    struct list *local_List = (struct list *)malloc(sizeof(struct list));
+    if( NULL == local_List )
+    {
+       printf("End here\n");
+       exit(0); 
+    }
+
+    /* generate and attach K nodes to the local list */
+    // local list means we wont bottleneck having to wait for mutex to create each new node
     while( counter  < K )
     {
         ptr = generate_data_node();
 
         if( NULL != ptr )
         {
-            while(1)
+            ptr->data  = 1;//generate data
+		    /* attache the generated node to the local list */
+            if( local_List->header == NULL )
             {
-		/* access the critical region and add a node to the global list */
-                if( !pthread_mutex_trylock(&mutex_lock) )
-                {
-                    ptr->data  = 1;//generate data
-		    /* attache the generated node to the global list */
-                    if( List->header == NULL )
-                    {
-                        List->header = List->tail = ptr;
-                    }
-                    else
-                    {
-                        List->tail->next = ptr;
-                        List->tail = ptr;
-                    }                    
-                    pthread_mutex_unlock(&mutex_lock);
-                    break;
-                }
-            }           
+                local_List->header = local_List->tail = ptr;
+            }
+            else
+            {
+                local_List->tail->next = ptr;
+                local_List->tail = ptr;
+            }
         }
         ++counter;
     }
+    /* access the critical region and add nodes to the global list */
+    // thread not doing anything else while waiting
+    // so use lock instead of trylock so the thread can sleep and not waste cycles waiting
+    pthread_mutex_lock(&mutex_lock);
+    
+    //add local list to global list
+    if( List->header == NULL ) {
+        List->header = local_List->header;
+        List->tail = local_List->tail;
+    }
+    else {
+        // append list to end
+        List->tail->next = local_List->header;
+        List->tail = local_List->tail;
+    }
+    
+    pthread_mutex_unlock(&mutex_lock);
 }
 
 int main(int argc, char* argv[])
